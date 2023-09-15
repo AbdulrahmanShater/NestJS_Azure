@@ -6,15 +6,21 @@ import {
 } from '@azure/service-bus';
 import { MessageService } from '../database/message.service';
 import { Message } from 'src/database/message.model';
+import { ErrorHandlingService } from 'src/error-handling/error-handling.service';
+import { LoggingService } from 'src/logging/logging.service';
 
 @Injectable()
 export class ServiceBusListenerService {
   private serviceBusClient: ServiceBusClient;
 
-  constructor(private readonly messageService: MessageService) {
-    const connectionString = process.env.AZURE_SERVICE_BUS_CONNECTION_STRING;
-
-    this.serviceBusClient = new ServiceBusClient(connectionString);
+  constructor(
+    private readonly messageService: MessageService,
+    private readonly errorHandlingService: ErrorHandlingService,
+    private readonly loggingService: LoggingService,
+  ) {
+    this.serviceBusClient = new ServiceBusClient(
+      process.env.AZURE_SERVICE_BUS_CONNECTION_STRING,
+    );
   }
 
   async startListening(queueName: string): Promise<void> {
@@ -24,17 +30,14 @@ export class ServiceBusListenerService {
 
     receiver.subscribe({
       processMessage: async (message: ServiceBusReceivedMessage) => {
-        // Process the message
         const content: Message = message.body;
 
-        // Store in MongoDB
         await this.messageService.create(content);
 
-        // Complete the message
         await receiver.completeMessage(message);
       },
       processError: async (err) => {
-        console.error(err);
+        this.errorHandlingService.handle(err.error);
       },
     });
   }
