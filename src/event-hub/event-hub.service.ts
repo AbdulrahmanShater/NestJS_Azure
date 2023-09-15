@@ -1,19 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { EventHubConsumerClient, EventPosition } from '@azure/event-hubs';
 import { DefaultAzureCredential } from '@azure/identity';
+import { ServiceBusService } from 'src/service-bus/service-bus.service';
 
 @Injectable()
 export class EventHubService {
   private consumerClient: EventHubConsumerClient;
 
-  constructor() {
-    const connectionString = process.env.AZURE_EVENT_HUB_CONNECTION_STRING;
-    const eventHubName = process.env.AZURE_EVENT_HUB_Name;
-
+  constructor(private readonly serviceBusService: ServiceBusService) {
     this.consumerClient = new EventHubConsumerClient(
       EventHubConsumerClient.defaultConsumerGroupName,
-      connectionString,
-      eventHubName,
+      process.env.AZURE_EVENT_HUB_CONNECTION_STRING,
+      process.env.AZURE_EVENT_HUB_Name,
       new DefaultAzureCredential(),
     );
   }
@@ -33,5 +31,11 @@ export class EventHubService {
         },
       });
     });
+  }
+  async processMessage(eventData): Promise<void> {
+    await this.serviceBusService.sendMessageToQueue(
+      process.env.QUEUE_NAME,
+      eventData.body,
+    );
   }
 }
